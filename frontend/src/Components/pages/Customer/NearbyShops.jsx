@@ -11,11 +11,16 @@ import {
 } from "@mui/material";
 import LocationOnIcon from "@mui/icons-material/LocationOn";
 import StarIcon from "@mui/icons-material/Star";
+import { useNavigate } from "react-router-dom";
 
 const NearbyShops = ({ latitude, longitude, fetchShops }) => {
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  console.log(latitude);
+  console.log(longitude);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (fetchShops && latitude && longitude) {
@@ -48,6 +53,10 @@ const NearbyShops = ({ latitude, longitude, fetchShops }) => {
     }
   }, [fetchShops, latitude, longitude]);
 
+  const handleCartClick = (shop) => {
+    navigate("/customer/servicerequest", { state: { shop } });
+  };
+
   return (
     <Box sx={{ flexGrow: 1, p: 3, mb: 3 }}>
       <Typography
@@ -79,6 +88,9 @@ const NearbyShops = ({ latitude, longitude, fetchShops }) => {
                   "&:hover": { transform: "scale(1.05)" },
                   position: "relative",
                   overflow: "hidden",
+                }}
+                onClick={() => {
+                  handleCartClick(shop);
                 }}
               >
                 {/* Card Media with Overlay */}

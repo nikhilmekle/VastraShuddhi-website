@@ -19,24 +19,27 @@ import FeedbackIcon from "@mui/icons-material/Feedback";
 import SupportIcon from "@mui/icons-material/Support";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import LogoutIcon from "@mui/icons-material/Logout";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import { useAuth } from "../../../context/auth";
 import toast from "react-hot-toast";
+
 const drawerWidth = 300;
 
 const CustomerDashboard = () => {
   const [open, setOpen] = useState(true);
   const [auth, setAuth] = useAuth();
-
   const navigate = useNavigate();
+  const location = useLocation();
+  const authData = JSON.parse(localStorage.getItem("auth"));
+
+  // Determine the active menu from URL path
+  const path = location.pathname.split("/").pop();
+  const [activeMenu, setActiveMenu] = useState(path || "home");
 
   const handleLogout = () => {
-    // Show logout success toast immediately
     toast.success("Logout Successfully");
-
-    // Wait 5 seconds before updating the auth state and navigating away
     setTimeout(() => {
-      setAuth({ ...auth, customer: null, token: "" }); // update auth after delay
+      setAuth({ ...auth, customer: null, token: "" });
       localStorage.removeItem("auth");
       navigate("/");
     }, 3000);
@@ -44,7 +47,7 @@ const CustomerDashboard = () => {
 
   return (
     <div style={{ display: "flex" }}>
-      {/* Top Navigation Bar */}
+      {/* Top App Bar */}
       <AppBar position="fixed" sx={{ zIndex: 1201 }}>
         <Toolbar>
           <IconButton
@@ -55,12 +58,12 @@ const CustomerDashboard = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Customer Dashboard
+            {authData?.customer?.name}
           </Typography>
         </Toolbar>
       </AppBar>
 
-      {/* Left Side Drawer */}
+      {/* Side Drawer */}
       <Drawer
         variant="persistent"
         anchor="left"
@@ -68,14 +71,19 @@ const CustomerDashboard = () => {
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          "& .MuiDrawer-paper": { width: drawerWidth, boxSizing: "border-box" },
+          "& .MuiDrawer-paper": {
+            width: drawerWidth,
+            boxSizing: "border-box",
+          },
         }}
       >
         <Toolbar />
         <List>
-          <ListItem>
+          <ListItem disablePadding>
             <ListItemButton
+              selected={activeMenu === "home"}
               onClick={() => {
+                setActiveMenu("home");
                 navigate("/");
               }}
             >
@@ -85,16 +93,30 @@ const CustomerDashboard = () => {
               <ListItemText primary="Home" />
             </ListItemButton>
           </ListItem>
-          <ListItem>
-            <ListItemButton>
+
+          <ListItem disablePadding>
+            <ListItemButton
+              selected={activeMenu === "requests"}
+              onClick={() => {
+                setActiveMenu("requests");
+                navigate("/customer/dashboard/requests");
+              }}
+            >
               <ListItemIcon>
                 <ShoppingCartIcon sx={{ color: "#33B5E5" }} />
               </ListItemIcon>
               <ListItemText primary="My Request" />
             </ListItemButton>
           </ListItem>
-          <ListItem>
-            <ListItemButton>
+
+          <ListItem disablePadding>
+            <ListItemButton
+              selected={activeMenu === "orders"}
+              onClick={() => {
+                setActiveMenu("orders");
+                navigate("/customer/dashboard/orders");
+              }}
+            >
               <ListItemIcon>
                 <ShoppingCartIcon sx={{ color: "#33B5E5" }} />
               </ListItemIcon>
@@ -102,26 +124,38 @@ const CustomerDashboard = () => {
             </ListItemButton>
           </ListItem>
 
-          <ListItem>
-            <ListItemButton>
+          <ListItem disablePadding>
+            <ListItemButton
+              selected={activeMenu === "payment"}
+              onClick={() => {
+                navigate("/customer/dashboard/payments");
+                setActiveMenu("payment");
+              }}
+            >
               <ListItemIcon>
                 <PaymentIcon sx={{ color: "#4CAF50" }} />
               </ListItemIcon>
-              <ListItemText primary="Payment History" />
+              <ListItemText primary="Resent Payments" />
             </ListItemButton>
           </ListItem>
 
-          <ListItem>
-            <ListItemButton>
+          <ListItem disablePadding>
+            <ListItemButton
+              selected={activeMenu === "notification"}
+              onClick={() => {
+                setActiveMenu("notification");
+                navigate("notifications");
+              }}
+            >
               <ListItemIcon>
                 <FeedbackIcon sx={{ color: "#FFC107" }} />
               </ListItemIcon>
-              <ListItemText primary="Feedback & Reviews" />
+              <ListItemText primary="Notifications" />
             </ListItemButton>
           </ListItem>
-
-          <ListItem>
-            <ListItemButton>
+          {/*}
+          <ListItem disablePadding>
+            <ListItemButton selected={activeMenu === "support"}>
               <ListItemIcon>
                 <SupportIcon sx={{ color: "#9C27B0" }} />
               </ListItemIcon>
@@ -129,16 +163,16 @@ const CustomerDashboard = () => {
             </ListItemButton>
           </ListItem>
 
-          <ListItem>
-            <ListItemButton>
+          <ListItem disablePadding>
+            <ListItemButton selected={activeMenu === "profile"}>
               <ListItemIcon>
                 <AccountCircleIcon sx={{ color: "#3F51B5" }} />
               </ListItemIcon>
               <ListItemText primary="Profile" />
             </ListItemButton>
-          </ListItem>
+          </ListItem> */}
 
-          <ListItem>
+          <ListItem disablePadding>
             <ListItemButton onClick={handleLogout}>
               <ListItemIcon>
                 <LogoutIcon sx={{ color: "#E91E63" }} />
@@ -150,18 +184,9 @@ const CustomerDashboard = () => {
       </Drawer>
 
       {/* Main Content Area */}
-      <main
-        style={{
-          flexGrow: 1,
-          padding: "20px",
-          marginLeft: open ? drawerWidth : 0,
-        }}
-      >
+      <main style={{ flexGrow: 1, padding: 16 }}>
         <Toolbar />
-        <Typography variant="h4">Welcome to Customer Dashboard</Typography>
-        <Typography variant="body1">
-          Manage your orders, payments, and profile here.
-        </Typography>
+        <Outlet />
       </main>
     </div>
   );

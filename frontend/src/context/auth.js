@@ -1,34 +1,39 @@
 import { useState, useEffect, useContext, createContext } from "react";
 import axios from "axios";
 
-const AuthContext = createContext(); // Make sure to use correct capitalization for consistency
+const AuthContext = createContext();
 
 const AuthProvider = ({ children }) => {
-  // Change 'Children' to 'children'
   const [auth, setAuth] = useState({
     customer: null,
-    token: "", // Initialize token as an empty string
+    token: "",
   });
 
-  //default axios
-  axios.defaults.headers.common["Authorization"] = auth?.token;
-
+  // Load auth data from localStorage when the app starts
   useEffect(() => {
     const data = localStorage.getItem("auth");
     if (data) {
       const parseData = JSON.parse(data);
-      setAuth({
-        ...auth,
+      setAuth((prevAuth) => ({
+        ...prevAuth,
         customer: parseData.customer,
         token: parseData.token,
-      });
+      }));
     }
-    //eslint-disable-next-line
   }, []);
+
+  // Update axios headers when auth.token changes
+  useEffect(() => {
+    if (auth.token) {
+      axios.defaults.headers.common["Authorization"] = `Bearer ${auth.token}`;
+    } else {
+      delete axios.defaults.headers.common["Authorization"];
+    }
+  }, [auth.token]);
 
   return (
     <AuthContext.Provider value={[auth, setAuth]}>
-      {children} {/* Render the children prop */}
+      {children}
     </AuthContext.Provider>
   );
 };

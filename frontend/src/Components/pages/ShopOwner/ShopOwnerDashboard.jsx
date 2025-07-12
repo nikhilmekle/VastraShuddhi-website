@@ -22,13 +22,20 @@ import LocalShippingIcon from "@mui/icons-material/LocalShipping"; // 🚚 Picku
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../context/ShopOwnerAuthProvider";
 import toast from "react-hot-toast";
+import RequestPage from "./RequestPage";
+import Orders from "../ShopOwner/Orders";
+import ShopDetails from "./ShopDetails";
+import Payments from "./Payments";
+import Notifications from "../Notifications";
 
 const drawerWidth = 300;
 
 const ShopOwnerDashboard = () => {
   const [auth, setAuth] = useAuth();
   const [open, setOpen] = useState(true);
+  const [activeMenu, setActiveMenu] = useState("Home");
   const navigate = useNavigate();
+  const authData = JSON.parse(localStorage.getItem("shopAuth"));
 
   const handleLogout = () => {
     toast.success("Logout Successfully");
@@ -57,7 +64,7 @@ const ShopOwnerDashboard = () => {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            {/* {auth.shop.shopName} */}Shop Owner Dashboard
+            {authData?.shop.shopName}
           </Typography>
         </Toolbar>
       </AppBar>
@@ -89,25 +96,40 @@ const ShopOwnerDashboard = () => {
           </ListItem>
 
           <ListItem>
-            <ListItemButton>
+            <ListItemButton
+              selected={activeMenu === "My Shop"}
+              onClick={() => {
+                setActiveMenu("My Shop");
+              }}
+            >
               <ListItemIcon>
                 <StorefrontIcon sx={{ color: "#8E24AA" }} />
               </ListItemIcon>
-              <ListItemText primary="My Store" />
+              <ListItemText primary="My Shop" />
             </ListItemButton>
           </ListItem>
 
           <ListItem>
-            <ListItemButton>
+            <ListItemButton
+              selected={activeMenu === "requests"} // change the background of seelected option
+              onClick={() => {
+                setActiveMenu("requests");
+              }}
+            >
               <ListItemIcon>
                 <LocalShippingIcon sx={{ color: "#5C6BC0" }} />
               </ListItemIcon>
-              <ListItemText primary="Pickup Requests" />
+              <ListItemText primary="Received Requests" />
             </ListItemButton>
           </ListItem>
 
           <ListItem>
-            <ListItemButton>
+            <ListItemButton
+              selected={activeMenu === "Orders"}
+              onClick={() => {
+                setActiveMenu("Orders");
+              }}
+            >
               <ListItemIcon>
                 <AssignmentIcon sx={{ color: "#43A047" }} />
               </ListItemIcon>
@@ -116,20 +138,30 @@ const ShopOwnerDashboard = () => {
           </ListItem>
 
           <ListItem>
-            <ListItemButton>
+            <ListItemButton
+              selected={activeMenu === "Payment"}
+              onClick={() => {
+                setActiveMenu("Payment");
+              }}
+            >
               <ListItemIcon>
                 <PaymentsIcon sx={{ color: "#FBC02D" }} />
               </ListItemIcon>
-              <ListItemText primary="Payments Received" />
+              <ListItemText primary="Payments " />
             </ListItemButton>
           </ListItem>
 
           <ListItem>
-            <ListItemButton>
+            <ListItemButton
+              selected={activeMenu === "notification"}
+              onClick={() => {
+                setActiveMenu("notification");
+              }}
+            >
               <ListItemIcon>
                 <ReceiptIcon sx={{ color: "#F57C00" }} />
               </ListItemIcon>
-              <ListItemText primary="Invoices" />
+              <ListItemText primary="Notifications" />
             </ListItemButton>
           </ListItem>
 
@@ -145,18 +177,19 @@ const ShopOwnerDashboard = () => {
       </Drawer>
 
       {/* Main Content Area */}
-      <main
-        style={{
-          flexGrow: 1,
-          padding: "20px",
-          marginLeft: open ? drawerWidth : 0,
-        }}
-      >
+      <main style={{ flexGrow: 1 }}>
         <Toolbar />
-        <Typography variant="h4">Welcome to Shop Owner Dashboard</Typography>
-        <Typography variant="body1">
-          Manage your store, orders, and payments efficiently.
-        </Typography>
+        {activeMenu === "requests" && <RequestPage />}
+        {activeMenu === "Orders" && <Orders />}
+        {activeMenu === "My Shop" && <ShopDetails />}
+        {activeMenu === "Payment" && <Payments />}
+        {activeMenu === "notification" && <Notifications type="ShopOwner" />}
+        {/* {activeMenu === "orders" && } */}
+        {activeMenu === "home" && (
+          <Typography variant="h6" align="center">
+            Welcome to your Dashboard. Please select an option from the menu.
+          </Typography>
+        )}
       </main>
     </div>
   );

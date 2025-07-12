@@ -153,10 +153,10 @@ const PublicHomePage = ({ setDialogOpen, setIsLogin }) => {
                 <CalendarMonthIcon sx={{ fontSize: 50, color: "#8e24aa" }} />
                 <CardContent>
                   <Typography variant="h6" fontWeight="bold" gutterBottom>
-                    Easy Scheduling
+                    Request for pickup
                   </Typography>
                   <Typography variant="body2">
-                    Choose convenient pickup & delivery slots.
+                    Request pickup request to nearby laundry shop
                   </Typography>
                 </CardContent>
               </Card>
@@ -278,7 +278,7 @@ const PublicHomePage = ({ setDialogOpen, setIsLogin }) => {
             >
               <Box textAlign="center">
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
-                  2. Schedule Pickup
+                  2. Requst for Pickup
                 </Typography>
                 <Typography variant="body2">
                   Choose a time & location for laundry pickup.
