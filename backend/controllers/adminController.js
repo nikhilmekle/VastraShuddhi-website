@@ -1,6 +1,7 @@
 import customerModel from "../models/Customer.js";
 import adminModel from "../models/Admin.js";
 import JWT from "jsonwebtoken";
+import serviceModel from "../models/Service.js";
 
 import { hashPassword, comparePassword } from "../helpers/authHelper.js";
 
@@ -62,69 +63,134 @@ export const adminRegisterController = async (req, res) => {
   }
 };
 
-
-
-
-
 //Admin Login controller
-export const adminLoginController =async (req , res)=>{
-    try {
-        const {email , password} = req.body;
+export const adminLoginController = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-        //validate email and password
-        if(!email) {
-            return res.status(404).send({
-                success:false,
-                message:"Enter Email Address"
-            })
-        }
-        if(!password){
-            return res.status(404).send({
-                success:false,
-                message:"Enter Password"
-            })
-        }
+    //validate email and password
+    if (!email) {
+      return res.status(404).send({
+        success: false,
+        message: "Enter Email Address",
+      });
+    }
+    if (!password) {
+      return res.status(404).send({
+        success: false,
+        message: "Enter Password",
+      });
+    }
 
     // Find the admin in the database by email
-        const admin = await adminModel.findOne({email})
+    const admin = await adminModel.findOne({ email });
 
-        if(!admin){
-            return res.status(200).send({
-                success:false,
-                message:"Email is not Register"
-            })
-        }
+    if (!admin) {
+      return res.status(200).send({
+        success: false,
+        message: "Email is not Register",
+      });
+    }
 
     // Compare the provided password with the stored hashed password
-    const match = await comparePassword(password , admin.password)
+    const match = await comparePassword(password, admin.password);
 
-    if(!match){
-        return res.status(200).send({
-            success:false,
-            message:"Invalid Password"
-        })
+    if (!match) {
+      return res.status(200).send({
+        success: false,
+        message: "Invalid Password",
+      });
     }
 
     // Generate a JWT token with the user's ID as the payload, set to expire in 7 days
-    const token = await JWT.sign({_id:admin._id} ,process.env.JWT_SECRET ,{
-        expiresIn:"1h",
-    })
+    const token = await JWT.sign({ _id: admin._id }, process.env.JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
     // Respond with user details and the generated token
     res.status(200).send({
-        success:true,
-        message:"Login Successfully",
-        admin:{
-            _id:admin._id,
-            name:admin.name
-        },
-        token
-    })
-} catch (error) {
-        res.status(500).send({
-            success:false,
-            message:"Error In Login",
-            error ,
-        })
+      success: true,
+      message: "Login Successfully",
+      admin: {
+        _id: admin._id,
+        name: admin.name,
+      },
+      token,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Error In Login",
+      error,
+    });
+  }
+};
+
+//create a service
+export const createService = async (req, res) => {
+  try {
+    const { service_name, price } = req.body;
+
+    if (!service_name || !price) {
+      return res.status(404).send({
+        success: false,
+        message: "Service name and price is required",
+      });
     }
-}
+    //find existing service
+    const service = await serviceModel.findOne({ service_name });
+
+    if (service) {
+      return res.status(200).send({
+        success: false,
+        message: "service already crreated ",
+      });
+    }
+
+    // create new service
+    const newService = new serviceModel({
+      service_name,
+      price,
+    });
+
+    await newService.save();
+
+    res.status(201).send({
+      success: true,
+      message: "Service Created Successfully",
+      newService,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "internal server error",
+      error,
+    });
+  }
+};
+
+//get all service
+export const getAllServices = async (req, res) => {
+  try {
+    const services = await serviceModel.find();
+
+    if (!services) {
+      return res.status(404).send({
+        success: false,
+        message: "Services Not Found",
+      });
+    }
+
+    res.status(200).send({
+      success: true,
+      message: "Services fetched Successfully",
+      services,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: true,
+      message: "internal server error",
+      error,
+    });
+  }
+};

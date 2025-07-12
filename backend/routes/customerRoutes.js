@@ -8,6 +8,7 @@ import {
   deleteReview,
   getCustomerOrder,
   getCustomerOrderById,
+  getCustomerPayments,
   getCustomerServiceRequests,
   getNearbyShops,
 } from "../controllers/customerController.js";
@@ -50,5 +51,7 @@ router.get("/customer/orders", requireSignIn, getCustomerOrder);
 
 //get orders by order id
 router.get("/customer/order/:orderId", requireSignIn, getCustomerOrderById);
+
+router.get("/customer/payment-history", requireSignIn, getCustomerPayments);
 
 export default router;

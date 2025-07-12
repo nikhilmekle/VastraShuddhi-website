@@ -17,24 +17,19 @@ const orderSchema = new mongoose.Schema(
       ref: "Shop",
       required: true,
     },
-    total_price: {
+    total_amount: {
       type: Number,
       required: true,
     },
-    payment_status: {
-      type: String,
-      enum: ["Paid", "Pending", "Failed"],
-      default: "Pending",
-    },
+
     order_status: {
       type: String,
-      enum: ["Processing", "Completed", "Cancelled"],
-      default: "Processing",
+      enum: ["In Progress", "Ready for delivery", "Completed", "Cancelled"],
+      default: "In Progress",
     },
-    payment_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Payment", // Reference to Payment model
-      default: null, // Initially no payment linked
+    isPaid: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true } // Automatically adds createdAt and updatedAt

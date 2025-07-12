@@ -12,25 +12,33 @@ const serviceRequestSchema = new mongoose.Schema(
       ref: "Shop",
       required: true,
     },
-    service_type: {
-      type: String,
-      enum: ["Dry Cleaning", "Pressing"],
-      required: true,
-    },
+    service_type: [
+      {
+        type: String,
+        required: true,
+      },
+    ], // ✅ Changed from String → Array to support multiple selections
     clothes: [
       {
         type: {
           type: String,
-          enum: ["Shirt", "Trousers", "T-shirt", "Jeans", "Suit", "Other"], // Define allowed types
           required: true,
         },
         quantity: {
           type: Number,
           required: true,
-          min: 1, // At least one item per type
+          min: 1,
         },
       },
     ],
+    total_quantity: {
+      type: Number,
+      required: true,
+    },
+    total_amount: {
+      type: Number,
+      required: true,
+    },
     status: {
       type: String,
       enum: ["Pending", "Accepted", "Rejected", "Completed"],

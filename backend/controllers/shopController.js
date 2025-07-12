@@ -2,7 +2,9 @@ import ShopsModel from "../models/Shop.js";
 import { hashPassword, comparePassword } from "../helpers/authHelper.js";
 import ServiceRequestModel from "../models/ServiceRequest.js";
 import OrderModel from "../models/Order.js";
+import PaymentModel from "../models/Payment.js";
 import JWT from "jsonwebtoken";
+import { sendNotification } from "../utils/sendNotifications.js";
 
 //----------------1-------------controller for shopOwner registration---------------------------
 
@@ -143,15 +145,37 @@ export const shopOwnerLoginController = async (req, res) => {
   }
 };
 
-// -----------------------------------------3 update service request controller---------import mongoose from "mongoose";
+// -----------------------------------------3 get service request controller---------import mongoose from "mongoose";
 
+export const getShopServiceRequest = async (req, res) => {
+  try {
+    const shopOwner_id = req.shop._id;
+    const requests = await ServiceRequestModel.find({ shopOwner_id }).populate({
+      path: "customer_id",
+      model: "Customer", // ✅ Explicitly mention the correct model
+      select: "name email  address  phone_number ",
+    });
+    res.status(200).send({
+      success: true,
+      message: "Service requests fetched successfully!",
+      requests,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Internal Server Error",
+      error,
+    });
+  }
+};
+
+// -----------------------------------------3 update service request controller---------import mongoose from "mongoose";
 export const updateServiceRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
     const { status } = req.body;
     const shop_id = req.shop._id;
 
-    // Find the service request and ensure the shop owner owns it
     const serviceRequest = await ServiceRequestModel.findOne({
       _id: requestId,
       shopOwner_id: shop_id,
@@ -164,7 +188,6 @@ export const updateServiceRequestStatus = async (req, res) => {
       });
     }
 
-    // Check current status from database
     if (serviceRequest.status !== "Pending") {
       return res.status(400).send({
         success: false,
@@ -172,14 +195,19 @@ export const updateServiceRequestStatus = async (req, res) => {
       });
     }
 
-    // Update status
     serviceRequest.status = status;
     await serviceRequest.save();
 
-    // 🔥 Only create an order if the service request is accepted
     if (status === "Accepted") {
       await createOrder(serviceRequest);
     }
+
+    // ✅ Ensure notification is sent BEFORE sending response
+    await sendNotification(
+      serviceRequest.customer_id,
+      "Customer",
+      `Your service request has been ${status.toLowerCase()}. So be ready with clothes for pickup.`
+    );
 
     res.status(200).send({
       success: true,
@@ -197,24 +225,38 @@ export const updateServiceRequestStatus = async (req, res) => {
 };
 
 // ------------------------------------create order function--------------------------
+
 export const createOrder = async (serviceRequest) => {
   try {
-    const newOrder = new OrderModel({
-      request_id: serviceRequest._id,
-      customer_id: serviceRequest.customer_id,
-      shopOwner_id: serviceRequest.shopOwner_id,
-      total_price: 0, // Initially 0, will update when calculating price
-      payment_status: "Pending",
-      order_status: "Processing",
-    });
-
-    await newOrder.save();
-    console.log(
-      "✅ Order created successfully for service request:",
+    // ✅ Fetch the service request details
+    const requestDetails = await ServiceRequestModel.findById(
       serviceRequest._id
     );
+
+    if (!requestDetails) {
+      console.error(" Service request not found:", serviceRequest._id);
+      return;
+    }
+
+    // ✅ Create a new order with fetched total_price and total_quantity
+    const newOrder = new OrderModel({
+      request_id: requestDetails._id,
+      customer_id: requestDetails.customer_id,
+      shopOwner_id: requestDetails.shopOwner_id,
+      total_amount: requestDetails.total_amount, // Fetching total price from ServiceRequest
+      total_quantity: requestDetails.total_quantity, // Fetching total quantity from ServiceRequest
+      order_status: "In Progress",
+    });
+
+    // ✅ Save order to database
+    await newOrder.save();
+
+    console.log(
+      "✅ Order created successfully for service request:",
+      requestDetails._id
+    );
   } catch (error) {
-    console.error("❌ Error creating order:", error);
+    console.error(" Error creating order:", error);
   }
 };
 
@@ -253,8 +295,11 @@ export const getShopOrderById = async (req, res) => {
     const { orderId } = req.params;
 
     const order = await OrderModel.findOne({ _id: orderId, shopOwner_id })
-      .populate("customer_id", "name email")
-      .populate("shopOwner_id", "name shopName")
+      .populate("customer_id", "name email address phone_number")
+      .populate(
+        "shopOwner_id",
+        "name email shop_name shop_address phone_number"
+      )
       .populate({
         path: "request_id",
         populate: { path: "clothes", select: "type quantity" },
@@ -267,10 +312,15 @@ export const getShopOrderById = async (req, res) => {
       });
     }
 
+    const formattedOrder = {
+      ...order._doc,
+      payment_status: order.isPaid ? "Paid" : "Pending",
+    };
+
     res.status(200).send({
       success: true,
       message: "Order fetched successfully",
-      order,
+      order: formattedOrder,
     });
   } catch (error) {
     res.status(500).send({
@@ -278,5 +328,107 @@ export const getShopOrderById = async (req, res) => {
       message: "Internal server error",
       error: error.message,
     });
+  }
+};
+
+//get shop details
+export const getShopDetails = async (req, res) => {
+  const shopOwner_id = req.shop._id;
+
+  try {
+    const shop = await ShopsModel.findById(shopOwner_id);
+
+    if (!shop) {
+      return res.status(404).send({
+        success: false,
+        message: "error while fetching shop data",
+      });
+    }
+    res.status(200).send({
+      success: true,
+      message: "Shop Data Fetched Successfully",
+      shop,
+    });
+  } catch (error) {
+    res.status(500).send({
+      success: false,
+      message: "Internal server Error",
+      error,
+    });
+  }
+};
+
+//update order status
+
+// Update order statusimport { sendNotification } from "../utils/notification"; // adjust path as needed
+
+export const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { order_status } = req.body;
+
+    const validStatuses = [
+      "In Progress",
+      "Ready for delivery",
+      "Completed",
+      "Cancelled",
+    ];
+    if (!validStatuses.includes(order_status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order status provided.",
+      });
+    }
+
+    // Fetch order including customer_id
+    const order = await OrderModel.findById(orderId);
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found.",
+      });
+    }
+
+    // Update status
+    order.order_status = order_status;
+    const updatedOrder = await order.save();
+
+    // Send notification to customer
+    await sendNotification(
+      order.customer_id,
+      "Customer",
+      `Your order status has been updated to "${order_status}".`
+    );
+
+    // Send success response
+    res.status(200).json({
+      success: true,
+      message: "Order status updated successfully.",
+      order: updatedOrder,
+    });
+  } catch (error) {
+    console.error("Error updating order status:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while updating order status.",
+    });
+  }
+};
+
+// GET /api/v2/payment/shop
+export const getShopPayments = async (req, res) => {
+  try {
+    const shopOwnerId = req.shop._id;
+    const payments = await PaymentModel.find({ shopOwnerId })
+      .populate("customerId", "name ")
+      .sort({
+        createdAt: -1,
+      });
+    res.status(200).json({ success: true, payments });
+  } catch (error) {
+    console.error("Error fetching shop payments:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch payments." });
   }
 };

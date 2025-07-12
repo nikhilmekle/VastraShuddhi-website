@@ -1,10 +1,12 @@
 import customerModel from "../models/Customer.js";
 import shopModel from "../models/Shop.js";
 import ServiceRequestModel from "../models/ServiceRequest.js";
+import PaymentModel from "../models/Payment.js";
 import ReviewModel from "../models/Review.js";
 import JWT from "jsonwebtoken";
 import OrderModel from "../models/Order.js";
 import mongoose from "mongoose";
+import { sendNotification } from "../utils/sendNotifications.js";
 
 import { hashPassword, comparePassword } from "../helpers/authHelper.js";
 
@@ -144,6 +146,8 @@ export const getNearbyShops = async (req, res) => {
     const userLatitude = parseFloat(latitude);
     const userLongitude = parseFloat(longitude);
 
+    console.log(userLatitude, userLongitude);
+
     // Find shops within 2km using geospatial query
     const nearbyShops = await shopModel.find({
       shop_location: {
@@ -152,7 +156,7 @@ export const getNearbyShops = async (req, res) => {
             type: "Point",
             coordinates: [userLongitude, userLatitude], // MongoDB stores [longitude, latitude]
           },
-          $maxDistance: 2000, // 2 km in meters
+          $maxDistance: 10000, // 10 km in meters
         },
       },
     });
@@ -181,10 +185,15 @@ export const getNearbyShops = async (req, res) => {
 
 //------------------------------------4------------- Create a new service request (Customer requests a pickup)------------
 
-// Controller to create a new service request
 export const createServiceRequest = async (req, res) => {
   try {
-    const { shopOwner_id, service_type, clothes } = req.body;
+    const {
+      shopOwner_id,
+      service_type,
+      clothes,
+      total_quantity,
+      total_amount,
+    } = req.body;
 
     // ✅ Extract customer ID from token
     const customer_id = req.customer._id;
@@ -193,21 +202,24 @@ export const createServiceRequest = async (req, res) => {
     if (
       !customer_id ||
       !shopOwner_id ||
-      !service_type ||
+      !Array.isArray(service_type) ||
+      service_type.length === 0 ||
       !Array.isArray(clothes) ||
-      clothes.length === 0
+      clothes.length === 0 ||
+      typeof total_quantity !== "number" ||
+      typeof total_amount !== "number"
     ) {
-      return res.status(400).send({
+      return res.status(400).json({
         success: false,
         message:
-          "Customer ID, Shop Owner ID, service type, and clothes details are required.",
+          "Customer ID, Shop Owner ID, at least one service type, clothes details, total quantity, and total price are required.",
       });
     }
 
     // ✅ Ensure clothes array is valid
     for (let item of clothes) {
       if (!item.type || !item.quantity || item.quantity < 1) {
-        return res.status(400).send({
+        return res.status(400).json({
           success: false,
           message:
             "Each clothing item must have a valid type and quantity (at least 1).",
@@ -215,7 +227,7 @@ export const createServiceRequest = async (req, res) => {
       }
     }
 
-    // ✅ Check if `shopOwner_id` is a valid MongoDB ObjectId
+    // ✅ Validate `shopOwner_id`
     if (!mongoose.Types.ObjectId.isValid(shopOwner_id)) {
       return res.status(400).json({
         success: false,
@@ -223,20 +235,28 @@ export const createServiceRequest = async (req, res) => {
       });
     }
 
-    // ✅ Convert `shopOwner_id` to ObjectId (customer_id is already an ObjectId)
+    // ✅ Convert `shopOwner_id` to ObjectId
     const shopOwnerObjectId = new mongoose.Types.ObjectId(shopOwner_id);
 
     // ✅ Create new service request
     const newRequest = new ServiceRequestModel({
-      customer_id, // ✅ Already an ObjectId from token
+      customer_id, // Already an ObjectId from token
       shopOwner_id: shopOwnerObjectId,
-      service_type,
+      service_type, // Now accepts multiple services
       clothes,
-      status: "Pending", // Default to "Pending"
+      total_quantity, // Taken from frontend
+      total_amount, // Taken from frontend
+      status: "Pending", // Default status
     });
 
     // ✅ Save to database
     await newRequest.save();
+
+    await sendNotification(
+      shopOwner_id,
+      "ShopOwner",
+      "You have received a new service request."
+    );
 
     res.status(201).json({
       success: true,
@@ -263,7 +283,7 @@ export const getCustomerServiceRequests = async (req, res) => {
     const requests = await ServiceRequestModel.find({ customer_id }).populate({
       path: "shopOwner_id",
       model: "Shop", // ✅ Explicitly mention the correct model
-      select: "shop_name shop_address",
+      select: "name shop_name shop_address  phone_number ",
     });
 
     res.status(200).send({
@@ -413,8 +433,11 @@ export const getCustomerOrder = async (req, res) => {
   try {
     const customer_id = req.customer._id;
     const orders = await OrderModel.find({ customer_id })
-      .populate("customer_id", "name email")
-      .populate("shopOwner_id", "name shopName")
+      .populate("customer_id", "name email address phone_number")
+      .populate(
+        "shopOwner_id",
+        "name email shop_name shop_address phone_number"
+      )
       .populate({
         path: "request_id",
         populate: { path: "clothes", select: "type quantity" },
@@ -448,8 +471,11 @@ export const getCustomerOrderById = async (req, res) => {
     const { orderId } = req.params;
 
     const order = await OrderModel.findOne({ _id: orderId, customer_id })
-      .populate("customer_id", "name email")
-      .populate("shopOwner_id", "name shopName")
+      .populate("customer_id", "name email address phone_number")
+      .populate(
+        "shopOwner_id",
+        "name email shop_name shop_address phone_number"
+      )
       .populate({
         path: "request_id",
         populate: { path: "clothes", select: "type quantity" },
@@ -462,16 +488,45 @@ export const getCustomerOrderById = async (req, res) => {
       });
     }
 
+    // Add derived field
+    const formattedOrder = {
+      ...order._doc,
+      payment_status: order.isPaid ? "Paid" : "Pending",
+    };
+
     res.status(200).send({
       success: true,
-      message: "Order fetched successfully",
-      order,
+      message: "Order fetched",
+      order: formattedOrder,
     });
   } catch (error) {
     res.status(500).send({
       success: false,
       message: "Internal server error",
       error: error.message,
+    });
+  }
+};
+
+export const getCustomerPayments = async (req, res) => {
+  try {
+    const customerId = req.customer._id;
+    // console.log("Customer ID from token:", customerId);
+
+    const payments = await PaymentModel.find({ customerId }).sort({
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      success: true,
+      message: "Payment history fetched successfully",
+      payments,
+    });
+  } catch (error) {
+    console.error("Error fetching payment history:", error);
+    res.status(500).json({
+      success: false,
+      message: "Something went wrong while fetching payment history",
     });
   }
 };
